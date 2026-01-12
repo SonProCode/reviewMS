@@ -4,6 +4,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sonth.reviewms.review.messaging.ReviewMessageProducer;
+
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -20,9 +22,13 @@ import org.springframework.web.bind.annotation.PutMapping;
 @RestController
 @RequestMapping("/reviews")
 public class ReviewController {
+
     private ReviewService reviewService;
-    public ReviewController(ReviewService reviewService) {
+    private ReviewMessageProducer reviewMessageProducer;
+
+    public ReviewController(ReviewService reviewService, ReviewMessageProducer reviewMessageProducer) {
         this.reviewService = reviewService;
+        this.reviewMessageProducer = reviewMessageProducer;
     }
 
     @GetMapping
@@ -35,6 +41,7 @@ public class ReviewController {
     public ResponseEntity<String> addReview(@RequestParam Long companyId, @RequestBody Review review) {
         boolean isCreated = reviewService.addReview(review, companyId);
         if (isCreated) {
+            reviewMessageProducer.sendMessage(review);
             return ResponseEntity.ok("Review added successfully");
         } else {
             return ResponseEntity.badRequest().body("Failed to add review");
@@ -68,6 +75,13 @@ public class ReviewController {
         } else {
             return ResponseEntity.badRequest().body("Failed to delete review");
         }
+    }
+    
+    @GetMapping("/averageRating")
+    public Double getAverageReview(@RequestParam Long companyId){
+        List<Review> reviewList = reviewService.getAllReviews(companyId);
+        return reviewList.stream().mapToDouble(Review::getRating).average()
+                .orElse(0.0);
     }
     
 
